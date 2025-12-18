@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base href="/">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <title>MultiFlix - Watch Free Movies & Series</title>
+
+    <!-- SEO & Icons -->
+    <meta name="title" content="MultiFlix">
+    <meta name="description" content="Stream the latest movies and TV series in HD.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="MultiFlix">
+    <meta property="og:image" content="https://ui-avatars.com/api/?name=Multi+Flix&background=E50914&color=fff&size=512">
+
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Tailwind Configuration -->
+    <script>
+        dayjs.extend(window.dayjs_plugin_relativeTime);
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: 'var(--brand-color)',
+                        base: '#000000',
+                        surface: '#121212',
+                        highlight: '#2A2A2A'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out',
+                        'slide-up': 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+                        'pop-in': 'popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                    },
+                    keyframes: {
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideUp: { '0%': { transform: 'translateY(20px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+                        popIn: { '0%': { transform: 'scale(0.95)', opacity: '0' }, '100%': { transform: 'scale(1)', opacity: '1' } }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="font-sans antialiased selection:bg-brand selection:text-white bg-black text-gray-200">
+
+    <!-- SPLASH -->
+    <div id="app-splash"><div class="splash-loader"></div></div>
+
+    <!-- NOTIFICATION -->
+    <div id="notification-container" class="fixed top-20 right-5 z-[110] flex flex-col gap-3 pointer-events-none"></div>
+
+    <!-- MODALS -->
+    <div id="legal-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center bg-black/95 p-5 backdrop-blur-sm animate-fade-in">
+        <div class="bg-surface border border-white/10 w-full max-w-2xl h-[80vh] rounded-2xl flex flex-col shadow-2xl animate-pop-in">
+            <div class="p-4 border-b border-white/10 flex justify-between items-center bg-highlight/50">
+                <h3 id="legal-modal-title" class="font-bold text-white text-lg">Legal</h3>
+                <button onclick="closeLegalModal()" class="text-gray-400 hover:text-white bg-white/5 rounded-full p-1"><i class="ri-close-line text-xl"></i></button>
+            </div>
+            <div id="legal-modal-body" class="p-6 overflow-y-auto custom-scrollbar"></div>
+        </div>
+    </div>
+
+    <div id="server-modal" class="fixed inset-0 z-[200] hidden flex items-center justify-center bg-black/80 backdrop-blur-sm p-5 animate-fade-in">
+        <div class="bg-surface border border-white/10 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl animate-pop-in">
+            <div class="p-4 border-b border-white/5 flex justify-between items-center bg-highlight/50">
+                <h3 class="font-bold text-white flex items-center gap-2"><i class="ri-server-line text-brand"></i> Select Server</h3>
+                <button onclick="closeServerModal()" class="text-gray-400 hover:text-white bg-white/5 rounded-full p-1"><i class="ri-close-line text-xl"></i></button>
+            </div>
+            <div id="server-list-container" class="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar"></div>
+        </div>
+    </div>
+
+    <div id="custom-confirm-modal" class="fixed inset-0 z-[120] hidden flex items-center justify-center bg-black/80 p-5 backdrop-blur-sm">
+        <div class="bg-surface border border-white/10 p-6 rounded-2xl max-w-sm w-full shadow-2xl animate-slide-up">
+            <div class="text-brand text-4xl mb-2"><i class="ri-customer-service-2-line"></i></div>
+            <h3 class="text-xl font-bold text-white mb-2">Request Content</h3>
+            <p class="text-gray-400 text-sm mb-6 leading-relaxed" id="confirm-modal-text"></p>
+            <div class="flex gap-3">
+                <button onclick="closeConfirmModal()" class="flex-1 py-3 rounded-xl font-bold text-gray-400 bg-highlight hover:bg-white/10 transition">Cancel</button>
+                <button id="confirm-action-btn" class="flex-1 py-3 rounded-xl font-bold text-white bg-brand hover:brightness-110 transition shadow-lg shadow-brand/20">Request Now</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" class="w-full md:max-w-7xl mx-auto min-h-screen bg-base pb-20 relative shadow-2xl shadow-white/5 border-x border-white/5">
+
+        <!-- HEADER -->
+        <header class="fixed top-0 left-0 right-0 w-full md:max-w-7xl mx-auto z-40 glass-header p-4 flex justify-between items-center rounded-b-3xl">
+            <div id="app-logo-container" onclick="showPage('home-page')" class="cursor-pointer">
+                <h1 class="text-2xl font-black tracking-tighter text-brand drop-shadow-xl">MULTI<span class="text-white">FLIX</span></h1>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button id="install-app-btn" class="hidden w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-200 transition">
+                    <i class="ri-download-2-fill text-lg"></i>
+                </button>
+                <button onclick="toggleSearchOverlay()" class="w-10 h-10 rounded-full bg-highlight/30 flex items-center justify-center text-white hover:bg-brand transition">
+                    <i class="ri-search-2-line text-xl"></i>
+                </button>
+                <button id="header-profile-btn" class="text-gray-300 hover:text-white transition active:scale-95" onclick="openAuthModal()">
+                    <div class="w-9 h-9 rounded-full bg-highlight/50 border border-white/10 flex items-center justify-center text-white overflow-hidden">
+                        <img id="user-avatar" src="" class="w-full h-full object-cover hidden">
+                        <i id="user-icon" class="ri-user-fill"></i>
+                    </div>
+                </button>
+            </div>
+        </header>
+
+        <!-- SEARCH OVERLAY -->
+        <div id="global-search-overlay" class="fixed inset-0 bg-base flex flex-col pt- safe-top">
+            <div class="p-4 glass-header flex items-center gap-3">
+                <button onclick="toggleSearchOverlay()" class="w-10 h-10 rounded-full bg-highlight flex items-center justify-center text-white hover:bg-brand transition">
+                    <i class="ri-arrow-down-s-line text-xl"></i>
+                </button>
+                <div class="flex-1 relative">
+                    <input type="text" id="global-search-input" class="w-full bg-highlight text-white rounded-full py-3 px-5 pl-12 focus:outline-none focus:ring-2 focus:ring-brand font-medium" placeholder="Search movies, series, people...">
+                    <i class="ri-search-line absolute left-4 top-3.5 text-gray-400"></i>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-5 pb-24 custom-scrollbar">
+                <div id="search-section-local" class="mb-8 hidden">
+                    <h3 class="text-brand font-bold text-xs uppercase tracking-wider mb-3 flex items-center gap-2"><i class="ri-play-circle-fill"></i> Watch Now</h3>
+                    <div id="search-results-local" class="grid grid-cols-3 md:grid-cols-5 gap-3"></div>
+                </div>
+                <div id="search-section-tmdb" class="mb-8 hidden">
+                    <h3 class="text-blue-500 font-bold text-xs uppercase tracking-wider mb-3 flex items-center gap-2"><i class="ri-download-cloud-2-fill"></i> Request to Add</h3>
+                    <div id="search-results-tmdb" class="grid grid-cols-3 md:grid-cols-5 gap-3"></div>
+                </div>
+                <div id="search-loader" class="hidden py-10 flex justify-center"><div class="content-loader"></div></div>
+            </div>
+        </div>
+
+        <main>
+            <!-- HOME PAGE -->
+            <div id="home-page" class="page active !pt-0">
+                <div id="banner-carousel" class="relative w-full bg-surface">
+                    <div class="w-full h-[65vh] md:h-[80vh] skeleton"></div>
+                </div>
+                <div id="home-content" class="relative z-20 -mt-8 space-y-8 min-h-[400px]"></div>
+                <footer class="relative z-20 pb-24 pt-12 px-5 text-center border-t border-white/5 mt-8">
+                    <h2 class="text-brand font-black text-2xl mb-4">MULTI<span class="text-white">FLIX</span></h2>
+                    <div class="flex justify-center gap-6 mb-6 text-sm text-gray-400 font-medium">
+                        <button onclick="openLegalModal('dmca')" class="hover:text-white transition">DMCA</button>
+                        <button onclick="openLegalModal('privacy')" class="hover:text-white transition">Privacy Policy</button>
+                    </div>
+                    <p class="text-[10px] text-gray-600 max-w-md mx-auto leading-relaxed">MultiFlix does not host any files on its servers.</p>
+                </footer>
+            </div>
+
+            <!-- DISCOVER PAGE -->
+            <div id="categories-page" class="page px-5">
+                <div class="mb-6 mt-4">
+                    <h2 class="text-3xl font-black text-white mb-2">Discover</h2>
+                    <p class="text-gray-400 text-sm">Browse by genre with top trending content</p>
+                </div>
+                <div id="genre-grid-container" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="col-span-full flex justify-center py-10"><div class="content-loader"></div></div>
+                </div>
+                <div id="category-search-container" class="hidden mb-6 sticky top-[70px] z-30 animate-fade-in">
+                    <div class="relative shadow-xl">
+                        <input type="text" id="category-search-input" class="w-full bg-highlight/90 backdrop-blur-md text-white rounded-xl py-3 px-5 pl-12 focus:outline-none focus:ring-2 focus:ring-brand border border-white/10" placeholder="Search in this category...">
+                        <i class="ri-search-2-line absolute left-4 top-3.5 text-gray-400"></i>
+                    </div>
+                </div>
+                <div id="category-results-container">
+                    <div id="genre-header" class="hidden flex justify-between items-end mb-4 border-b border-white/10 pb-2">
+                        <h3 id="selected-genre-title" class="text-xl font-bold text-brand">Action</h3>
+                    </div>
+                    <div id="category-tmdb-results" class="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3 md:gap-6"></div>
+                    <div id="category-load-more" class="hidden"><button onclick="loadNextPage()" class="load-more-btn">Load Next 20 <i class="ri-arrow-down-line"></i></button></div>
+                </div>
+            </div>
+
+            <!-- MOVIES PAGE -->
+            <div id="movies-page" class="page !pt-0">
+                <div id="movies-banner" class="relative w-full h-[50vh] bg-surface flex items-center justify-center overflow-hidden">
+                    <div class="skeleton absolute inset-0 w-full h-full z-10"></div>
+                    <img id="movies-hero-img" class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-700">
+                    <div class="absolute inset-0 bg-gradient-to-t from-base via-base/40 to-transparent z-0"></div>
+                    <h2 class="absolute bottom-5 left-5 text-3xl font-black text-white drop-shadow-xl z-20">Movies</h2>
+                </div>
+                <div id="movies-content" class="relative z-20 -mt-4 px-5 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3 md:gap-6"></div>
+                <div id="movies-loader" class="content-loader-container hidden"><div class="content-loader"></div></div>
+                <div id="movies-more-btn" class="hidden"><button onclick="loadNextPage()" class="load-more-btn">Load Next 20 <i class="ri-arrow-down-line"></i></button></div>
+            </div>
+
+            <!-- SERIES PAGE -->
+            <div id="series-page" class="page !pt-0">
+                <div id="series-banner" class="relative w-full h-[50vh] bg-surface flex items-center justify-center overflow-hidden">
+                    <div class="skeleton absolute inset-0 w-full h-full z-10"></div>
+                    <img id="series-hero-img" class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-700">
+                    <div class="absolute inset-0 bg-gradient-to-t from-base via-base/40 to-transparent z-0"></div>
+                    <h2 class="absolute bottom-5 left-5 text-3xl font-black text-white drop-shadow-xl z-20">Series</h2>
+                </div>
+                <div id="series-content" class="relative z-20 -mt-4 px-5 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3 md:gap-6"></div>
+                <div id="series-loader" class="content-loader-container hidden"><div class="content-loader"></div></div>
+                <div id="series-more-btn" class="hidden"><button onclick="loadNextPage()" class="load-more-btn">Load Next 20 <i class="ri-arrow-down-line"></i></button></div>
+            </div>
+
+            <!-- MY LIST PAGE -->
+            <div id="mylist-page" class="page px-5">
+                <div class="flex justify-between items-end mb-8 mt-4">
+                    <h2 class="text-3xl font-bold">My List</h2>
+                    <span class="text-sm font-medium text-brand" id="mylist-count">0</span>
+                </div>
+                <div id="mylist-grid" class="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3 md:gap-6 pb-24"></div>
+            </div>
+
+            <!-- PLAYER PAGE -->
+            <div id="player-page" class="page bg-base min-h-screen z-[60] pb-0 fixed inset-0 overflow-y-auto !pt-0">
+                <div class="fixed top-0 left-0 w-full z-50 p-4 pointer-events-none">
+                    <button onclick="closePlayerPage()" class="pointer-events-auto bg-black/40 backdrop-blur-md p-2 rounded-full text-white hover:bg-brand transition shadow-lg"><i class="ri-arrow-left-line text-2xl"></i></button>
+                </div>
+                <div class="w-full bg-black sticky top-0 z-40 shadow-2xl shadow-black">
+                    <div id="video-area" class="w-full max-w-7xl mx-auto aspect-video bg-black relative"></div>
+                    <div id="server-trigger-bar" onclick="openServerModal()" class="cursor-pointer bg-surface border-y border-white/10 py-3 px-5 flex justify-between items-center hover:bg-highlight transition group hidden">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-highlight flex items-center justify-center text-brand group-hover:scale-110 transition"><i class="ri-server-fill"></i></div>
+                            <div>
+                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Select Server Resources</p>
+                                <p id="current-server-name" class="text-sm font-bold text-white leading-tight">Loading...</p>
+                            </div>
+                        </div>
+                        <i class="ri-arrow-right-s-line text-gray-500 group-hover:text-white text-xl"></i>
+                    </div>
+                </div>
+                <div class="p-5 pb-24 relative z-30 bg-base min-h-[50vh] max-w-7xl mx-auto">
+                    <div id="player-meta"></div>
+                    <div class="flex border-b border-white/10 mt-6 mb-6 sticky top-0 bg-base z-20 pt-2 overflow-x-auto no-scrollbar">
+                        <button onclick="switchTab('episodes')" id="tab-episodes" class="tab-btn px-4 pb-3 text-sm font-semibold text-gray-400 hover:text-white whitespace-nowrap hidden">Episodes</button>
+                        <button onclick="switchTab('similar')" id="tab-similar" class="tab-btn active px-4 pb-3 text-sm font-semibold text-gray-400 hover:text-white whitespace-nowrap">Similar</button>
+                        <button onclick="switchTab('downloads')" id="tab-downloads" class="tab-btn px-4 pb-3 text-sm font-semibold text-gray-400 hover:text-white whitespace-nowrap">Downloads</button>
+                        <button onclick="switchTab('comments')" id="tab-comments" class="tab-btn px-4 pb-3 text-sm font-semibold text-gray-400 hover:text-white whitespace-nowrap">Comments</button>
+                    </div>
+                    <div id="content-episodes" class="tab-content hidden animate-fade-in">
+                        <div id="season-selector-container" class="mb-4 md:max-w-md"><select id="season-select" onchange="renderEpisodes(this.value)" class="w-full bg-highlight text-white p-3 rounded-lg outline-none font-bold border border-white/10 focus:border-brand"></select></div>
+                        <div id="episodes-list" class="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0"></div>
+                    </div>
+                    <div id="content-similar" class="tab-content block animate-fade-in">
+                        <div id="similar-grid" class="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-3 md:gap-6"></div>
+                        <div id="similar-loader" class="content-loader-container hidden"><div class="content-loader"></div></div>
+                        <div id="similar-load-more-btn" class="hidden"><button onclick="loadNextSimilarPage()" class="load-more-btn">Load Next 20 <i class="ri-arrow-down-line"></i></button></div>
+                    </div>
+                    <div id="content-downloads" class="tab-content hidden animate-fade-in">
+                        <div id="downloads-list" class="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0"></div>
+                    </div>
+                    <div id="content-comments" class="tab-content hidden animate-fade-in">
+                        <div class="flex gap-2 mb-6"><input id="comment-input" type="text" class="flex-1 bg-highlight rounded-lg px-4 py-3 text-sm text-white outline-none" placeholder="Add a comment..."><button onclick="postComment()" class="bg-brand text-white px-4 py-2 rounded-lg"><i class="ri-send-plane-fill"></i></button></div>
+                        <div id="comments-list" class="space-y-5"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AUTH MODAL -->
+            <div id="auth-modal" class="fixed inset-0 z-[100] hidden flex items-end md:items-center justify-center">
+                <div class="absolute inset-0 bg-black/90 backdrop-blur-sm" onclick="closeAuthModal()"></div>
+                <div class="relative bg-surface w-full md:w-[400px] md:rounded-2xl rounded-t-3xl p-8 border-t md:border border-white/10 shadow-2xl animate-slide-up">
+                    <div class="flex justify-between items-center mb-8">
+                        <h1 class="text-2xl font-black text-brand">ACCOUNT</h1>
+                        <button onclick="closeAuthModal()" class="text-gray-400 hover:text-white"><i class="ri-close-line text-2xl"></i></button>
+                    </div>
+                    <div id="auth-view-guest">
+                        <div id="login-container">
+                            <form id="login-form" class="space-y-4">
+                                <input type="email" id="login-email" class="w-full bg-highlight rounded-xl p-4 text-white outline-none focus:ring-2 focus:ring-brand" placeholder="Email" required>
+                                <input type="password" id="login-password" class="w-full bg-highlight rounded-xl p-4 text-white outline-none focus:ring-2 focus:ring-brand" placeholder="Password" required>
+                                <button type="submit" class="w-full bg-brand hover:brightness-110 rounded-xl p-4 font-bold text-white shadow-lg">Sign In</button>
+                            </form>
+                            <p class="text-center text-gray-400 mt-6 text-sm">New? <button id="show-signup-btn" class="text-white font-bold hover:underline">Create account</button></p>
+                        </div>
+                        <div id="signup-container" class="hidden">
+                            <form id="signup-form" class="space-y-4">
+                                <input type="email" id="signup-email" class="w-full bg-highlight rounded-xl p-4 text-white outline-none focus:ring-2 focus:ring-brand" placeholder="Email" required>
+                                <input type="password" id="signup-password" class="w-full bg-highlight rounded-xl p-4 text-white outline-none focus:ring-2 focus:ring-brand" placeholder="Password" required>
+                                <button type="submit" class="w-full bg-white text-black hover:bg-gray-200 rounded-xl p-4 font-bold shadow-lg">Sign Up</button>
+                            </form>
+                            <p class="text-center text-gray-400 mt-6 text-sm">Member? <button id="show-login-btn" class="text-brand font-bold hover:underline">Log in</button></p>
+                        </div>
+                        <p id="auth-error" class="text-red-500 text-center text-xs mt-4"></p>
+                    </div>
+                    <div id="auth-view-user" class="hidden text-center">
+                        <div class="w-16 h-16 bg-highlight rounded-full mx-auto flex items-center justify-center mb-4 text-2xl text-white"><i class="ri-user-smile-line"></i></div>
+                        <p class="text-white font-bold mb-1">Logged In</p>
+                        <p class="text-gray-400 text-xs mb-6 font-mono" id="user-email-display"></p>
+                        <button onclick="handleSignOut()" class="w-full bg-white/10 hover:bg-white/20 text-red-500 py-4 rounded-xl font-bold border border-white/5 flex items-center justify-center gap-2"><i class="ri-logout-box-r-line"></i> Sign Out</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- BOTTOM NAV -->
+        <nav class="fixed bottom-0 left-0 right-0 w-full md:max-w-7xl mx-auto glass-nav z-40 pb-safe rounded-t-2xl">
+            <div class="flex justify-around items-center h-16 px-2">
+                <button data-page="home-page" class="nav-btn text-white flex flex-col items-center w-1/5 group">
+                    <i class="ri-home-5-fill text-2xl mb-1"></i><span class="text-[10px] font-bold">Home</span>
+                </button>
+                <button data-page="categories-page" class="nav-btn text-gray-500 flex flex-col items-center w-1/5 group">
+                    <i class="ri-compass-3-fill text-2xl mb-1"></i><span class="text-[10px] font-medium">Discover</span>
+                </button>
+                <button data-page="movies-page" class="nav-btn text-gray-500 flex flex-col items-center w-1/5 group">
+                    <i class="ri-movie-2-line text-2xl mb-1"></i><span class="text-[10px] font-medium">Movies</span>
+                </button>
+                <button data-page="series-page" class="nav-btn text-gray-500 flex flex-col items-center w-1/5 group">
+                    <i class="ri-tv-line text-2xl mb-1"></i><span class="text-[10px] font-medium">Series</span>
+                </button>
+                <button onclick="handleListClick()" data-page="mylist-page" class="nav-btn text-gray-500 flex flex-col items-center w-1/5 group">
+                    <i class="ri-bookmark-line text-2xl mb-1"></i><span class="text-[10px] font-medium">List</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <!-- MAIN LOGIC SCRIPT -->
+    <script src="script.js"></script>
+</body>
+</html>
